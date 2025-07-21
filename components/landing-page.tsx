@@ -139,11 +139,6 @@ export function LandingPage() {
           </div>
         </section>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-600 text-white text-center py-4 mt-24">
-        <p className="text-sm">AtivIA © 202X. All rights reserved.</p>
-      </footer>
     </div>
   )
 }

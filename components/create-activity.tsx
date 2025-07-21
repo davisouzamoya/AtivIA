@@ -12,13 +12,16 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { createActivity } from "@/lib/activities"
 
 export function CreateActivity() {
   const router = useRouter()
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
   const [isGenerating, setIsGenerating] = useState(false)
   const [formData, setFormData] = useState({
     theme: "",
     name: "",
+    subject: "",
     objective: "",
     grade: "",
     activityType: "",
@@ -51,20 +54,114 @@ export function CreateActivity() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.theme || !formData.grade || !formData.activityType || !formData.questionCount) {
-      alert("Por favor, preencha todos os campos obrigatórios.")
-      return
+    if (!formData.theme || !formData.name || !formData.subject || !formData.grade || !formData.activityType || !formData.questionCount) {
+      alert("Por favor, preencha todos os campos obrigatórios.");
+      return;
     }
 
     setIsGenerating(true)
 
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyDWGjC_xsHyfUTqE5phZHhwXHW34_rVSRo", {
+      const isTrueFalse = formData.activityType === "verdadeiro ou falso";
+      const isCompleteGaps = formData.activityType === "completar lacunas";
+      const isDissertative = formData.activityType === "dissertativa";
+      
+      const prompt = `
+        Gere uma prova escolar com as seguintes características:
+        - Nome da atividade: ${formData.name}
+        - Tema: ${formData.theme}
+        - Disciplina: ${formData.subject}
+        - Objetivo pedagógico: ${formData.objective || "não especificado"}
+        - Ano/Série: ${formData.grade}
+        - Tipo de questão: ${formData.activityType}
+        - Quantidade de questões: ${formData.questionCount}
+        
+        ${isTrueFalse ? `
+        REGRAS ESPECÍFICAS PARA VERDADEIRO OU FALSO:
+        1. Cada questão deve ser uma afirmação clara e objetiva sobre o tema.
+        2. Formate cada questão da seguinte forma:
+           **1. [Afirmação sobre o tema]**
+           
+            ( ) Verdadeiro
+           
+            ( ) Falso 
+           
+           **Gabarito:** [Verdadeiro/Falso]
+           
+        3. Use parênteses vazios ( ) para o aluno marcar a resposta.
+        4. As afirmações devem ser adequadas ao nível educacional informado.
+        5. Inclua uma mistura equilibrada de afirmações verdadeiras e falsas.
+        6. Cada afirmação deve ser específica e testável.
+        7. Não use afirmações muito óbvias ou muito complexas.
+        8. O gabarito deve vir logo após cada questão, em negrito.
+        9. Deixe uma linha em branco entre cada questão.
+        10. Comece diretamente pela primeira questão, sem títulos ou cabeçalhos.
+        11. Use quebras de linha naturais do Markdown, sem adicionar '\\n' manualmente no final do Verdadeiro, Falso e no final da pergunta.
+        12. Remova da resposta os campos "Nome da atividade", "Tema", "Disciplina", "Ano/Série" ou "Objetivo pedagógico", "Tipo de questão" e "Quantidade de questões". Essas informações já serão exibidas separadamente.
+        ` : isCompleteGaps ? `
+        REGRAS ESPECÍFICAS PARA COMPLETAR LACUNAS:
+        1. Cada questão deve ser um texto com lacunas (espaços em branco) para o aluno preencher.
+        2. Formate cada questão da seguinte forma:
+           **1. [Texto com _____ lacunas para completar]**
+           
+           **Gabarito:** [Palavra ou frase correta para cada lacuna]
+           
+        3. Use underscores (_____) para indicar as lacunas no texto.
+        4. O texto deve ser contextualizado e adequado ao nível educacional informado.
+        5. As lacunas devem ser estratégicas, testando conceitos importantes do tema.
+        6. Cada lacuna deve ter uma resposta clara e específica.
+        7. O gabarito deve listar todas as respostas corretas na ordem das lacunas.
+        8. Deixe uma linha em branco entre cada questão.
+        9. Comece diretamente pela primeira questão, sem títulos ou cabeçalhos.
+        10. Use quebras de linha naturais do Markdown, sem caracteres especiais.
+        11. Remova da resposta os campos "Nome da atividade", "Tema", "Disciplina", "Ano/Série" ou "Objetivo pedagógico", "Tipo de questão" e "Quantidade de questões". Essas informações já serão exibidas separadamente.
+        12. Coloque negrito apenas nos números do indice
+        ` : `
+        REGRAS GERAIS:
+        1. As questões devem ser claras, objetivas e adequadas ao nível informado.
+        2. Inclua o gabarito ao final de cada questão.
+        3. Não repita perguntas.
+        4. Formate a resposta como uma lista numerada, cada questão seguida do gabarito.
+        5. Gere a prova no formato markdown, usando títulos, listas e negrito para os campos importantes.
+        6. Liste as alternativas de cada questão uma embaixo da outra, cada uma em sua própria linha, usando letras (a), (b), (c), (d).
+        7. Não use nenhum outro formato além do markdown.
+        8. As alternativas de cada questão devem ser apresentadas como uma lista markdown, usando '-' antes de cada alternativa, e a letra entre parênteses, por exemplo:
+        - (a) Alternativa 1
+        - (b) Alternativa 2
+        - (c) Alternativa 3
+        - (d) Alternativa 4
+        Não use espaços, recuos ou outros marcadores antes do '-'. Não use letras maiúsculas nos marcadores.
+        9. Não adicione linha em branco entre as alternativas, apenas entre as alternativas e o gabarito.
+        10. Use quebras de linha naturais do Markdown, sem adicionar '\\n' manualmente.
+        11. Remova da resposta os campos "Nome da atividade", "Tema", "Disciplina", "Ano/Série" ou "Objetivo pedagógico", "Tipo de questão" e "Quantidade de questões". Essas informações já serão exibidas separadamente.
+        12. Não inclua nenhum título, cabeçalho ou linha inicial com o nome da atividade, tema, disciplina, ano/série, objetivo, tipo de questão ou quantidade de questões, nem qualquer combinação desses campos. Comece diretamente pelas questões.
+        13. A pergunta deve vir em negrito o gabarito tem que ficar na linha debaixo e ter um espaço entre eles.
+        14. O gabarito deve ser em negrito e ter um espaço entre o gabarito e a próxima pergunta.
+        15. Depois do gabarito use quebras de linha naturais do Markdown, sem adicionar '\\n\\n' manualmente
+        16. Coloque negrito apenas nos números do indice
+        `}
+      `;
+
+      const body = JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ]
+      });
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: body,
       })
 
       if (!response.ok) {
@@ -72,21 +169,40 @@ export function CreateActivity() {
         throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`)
       }
 
-      const data = await response.json()
+      const data = await response.json();
 
-      if (data.success) {
-        // Store the generated activity in localStorage
-        localStorage.setItem("generatedActivity", JSON.stringify(data.activity))
+      // Pegando o texto gerado pela IA:
+      const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        // Also add to activities list for dashboard
-        const existingActivities = JSON.parse(localStorage.getItem("userActivities") || "[]")
-        existingActivities.push(data.activity)
-        localStorage.setItem("userActivities", JSON.stringify(existingActivities))
+      if (generatedText) {
+        // Cria objeto padronizado da atividade
+        const activityData = {
+          name: formData.name,
+          subject: formData.subject,
+          text: generatedText,
+          theme: formData.theme,
+          objective: formData.objective,
+          grade: formData.grade,
+          activity_type: formData.activityType,
+          question_count: parseInt(formData.questionCount),
+        };
 
-        // Redirect to the edit page with the generated activity
-        router.push(`/edit-activity/${data.activity.id}`)
+        // Salva no Supabase
+        console.log("Salvando atividade no Supabase...", activityData);
+        const savedActivity = await createActivity(activityData);
+        
+        if (savedActivity) {
+          console.log("Atividade salva com sucesso:", savedActivity);
+          // Salva também no localStorage para compatibilidade
+          localStorage.setItem("generatedActivity", JSON.stringify(savedActivity));
+          
+          // Redireciona para a página de edição
+          router.push(`/edit-activity/${savedActivity.id}`);
+        } else {
+          throw new Error("Erro ao salvar atividade no banco de dados. Verifique sua conexão.");
+        }
       } else {
-        throw new Error(data.error || "Erro desconhecido")
+        throw new Error("A resposta da IA não pôde ser processada.");
       }
     } catch (error) {
       console.error("Error:", error)
@@ -134,6 +250,40 @@ export function CreateActivity() {
             <h1 className="text-3xl font-bold text-gray-900 mb-8">Criar Nova Atividade</h1>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome da Atividade *</Label>
+                <Input
+                  id="name"
+                  placeholder='ex. "Prova de Matemática - Multiplicação"'
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subject">Disciplina *</Label>
+                <Select
+                  value={formData.subject}
+                  onValueChange={(value) => setFormData({ ...formData, subject: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Matemática">Matemática</SelectItem>
+                    <SelectItem value="Português">Português</SelectItem>
+                    <SelectItem value="História">História</SelectItem>
+                    <SelectItem value="Geografia">Geografia</SelectItem>
+                    <SelectItem value="Ciências">Ciências</SelectItem>
+                    <SelectItem value="Inglês">Inglês</SelectItem>
+                    <SelectItem value="Artes">Artes</SelectItem>
+                    <SelectItem value="Educação Física">Educação Física</SelectItem>
+                    <SelectItem value="Filosofia">Filosofia</SelectItem>
+                    <SelectItem value="Sociologia">Sociologia</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="theme">Escolher Tema *</Label>
                 <Input
@@ -191,7 +341,6 @@ export function CreateActivity() {
                     <SelectItem value="múltipla escolha">Múltipla escolha</SelectItem>
                     <SelectItem value="verdadeiro ou falso">Verdadeiro ou Falso</SelectItem>
                     <SelectItem value="completar lacunas">Completar lacunas</SelectItem>
-                    <SelectItem value="dissertativa">Dissertativa</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -229,11 +378,6 @@ export function CreateActivity() {
               </Button>
             </form>
 
-            <div className="mt-8">
-              <Link href="/help" className="text-blue-600 text-sm underline">
-                Encontrou algum problema?
-              </Link>
-            </div>
           </div>
 
           {/* Configuration Section */}
@@ -262,11 +406,6 @@ export function CreateActivity() {
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-600 text-white text-center py-4 mt-12">
-        <p className="text-sm">AtivIA © 202X. All rights reserved.</p>
-      </footer>
     </div>
   )
 }

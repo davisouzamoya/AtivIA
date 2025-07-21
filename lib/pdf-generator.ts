@@ -15,6 +15,7 @@ interface Activity {
   theme: string
   objective: string
   questions: Question[]
+  text?: string // Added text property
 }
 
 export async function generatePDF(activity: Activity) {
@@ -28,21 +29,25 @@ export async function generatePDF(activity: Activity) {
   pdf.setFont("helvetica", "bold")
   pdf.text("ATIVIDADE", 20, 30)
 
+  // Espaço para o nome do aluno
+  pdf.setFontSize(12)
+  pdf.setFont("helvetica", "normal")
+  
+
   // Activity Information
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "normal")
 
-  let yPosition = 50
+  let yPosition = 48
   const lineHeight = 8
 
   // Activity details
   const details = [
-    `Nome: ${activity.name}`,
     `Série: ${activity.grade}`,
     `Disciplina: ${activity.subject}`,
-    `Tema: ${activity.theme}`,
-    `Objetivo: ${activity.objective}`,
   ]
+
+  pdf.text("Nome do Aluno: ___________________________", 20, 40)
 
   details.forEach((detail) => {
     // Handle long text wrapping
@@ -63,39 +68,34 @@ export async function generatePDF(activity: Activity) {
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "normal")
 
-  activity.questions.forEach((question, index) => {
-    // Check if we need a new page
-    if (yPosition > 250) {
-      pdf.addPage()
-      yPosition = 30
+  // Renderizar o texto Markdown das questões
+  if (activity.text) {
+    // Remove linhas de gabarito
+    let lines = activity.text
+      .split('\n')
+      .filter(line => !line.trim().toLowerCase().startsWith('**gabarito:'));
+    // Remove tudo antes da primeira questão (linha que começa com '1.')
+    const firstQuestionIdx = lines.findIndex(line => line.trim().match(/^1\./));
+    if (firstQuestionIdx !== -1) {
+      lines = lines.slice(firstQuestionIdx);
     }
-
-    // Question text
-    pdf.setFont("helvetica", "bold")
-    const questionText = `${index + 1}. ${question.question}`
-    const questionLines = pdf.splitTextToSize(questionText, 170)
-
-    questionLines.forEach((line: string) => {
+    const textSomenteQuestoes = lines.join('\n');
+    // Remove todos os '**' e traços '-' do início das alternativas
+    let textoLimpo = textSomenteQuestoes
+      .replace(/\*\*/g, '') // remove todos os **
+      .replace(/^\s*-\s*(\([a-d]\))/gm, '$1'); // remove traço do início das alternativas
+    // Quebra o texto em linhas para evitar overflow
+    const markdownLines = pdf.splitTextToSize(textoLimpo, 170)
+    markdownLines.forEach((line: string) => {
+      if (yPosition > 250) {
+        pdf.addPage()
+        yPosition = 30
+      }
       pdf.text(line, 20, yPosition)
       yPosition += lineHeight
     })
-
-    yPosition += 5
-
-    // Options
-    pdf.setFont("helvetica", "normal")
-    question.options.forEach((option, optionIndex) => {
-      const optionText = `${String.fromCharCode(65 + optionIndex)}) ${option}`
-      const optionLines = pdf.splitTextToSize(optionText, 160)
-
-      optionLines.forEach((line: string) => {
-        pdf.text(line, 30, yPosition)
-        yPosition += lineHeight
-      })
-    })
-
     yPosition += 10
-  })
+  }
 
   // Footer
   const pageCount = pdf.getNumberOfPages()

@@ -9,6 +9,7 @@ import { Search, MoreHorizontal, Edit, Download, Trash2, PenTool } from "lucide-
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
+import { getActivities, deleteActivity } from "@/lib/activities"
 import { useRouter } from "next/navigation"
 
 interface Activity {
@@ -17,9 +18,9 @@ interface Activity {
   theme: string
   grade: string
   subject: string
-  activityType: string
-  questions: any[]
-  createdAt: string
+  activity_type: string
+  text: string
+  created_at: string
 }
 
 export function Dashboard() {
@@ -28,12 +29,6 @@ export function Dashboard() {
   const [activities, setActivities] = useState<Activity[]>([])
 
   useEffect(() => {
-    // Load activities from localStorage
-    const storedActivities = localStorage.getItem("userActivities")
-    if (storedActivities) {
-      setActivities(JSON.parse(storedActivities))
-    }
-
     // Check user session and redirect if not logged in
     const checkUser = async () => {
       const {
@@ -41,6 +36,10 @@ export function Dashboard() {
       } = await supabase.auth.getUser()
       if (!user) {
         router.push("/login")
+      } else {
+        // Load activities from Supabase
+        const activitiesData = await getActivities()
+        setActivities(activitiesData)
       }
     }
     checkUser()
@@ -58,14 +57,29 @@ export function Dashboard() {
 
   const handleExportActivity = async (activity: Activity) => {
     const { generatePDF } = await import("@/lib/pdf-generator")
-    await generatePDF(activity)
+    // Converter para o formato esperado pelo generatePDF
+    const pdfActivity = {
+      id: activity.id,
+      name: activity.name,
+      grade: activity.grade,
+      subject: activity.subject,
+      theme: activity.theme,
+      objective: "",
+      text: activity.text,
+      questions: [], // Adicionar propriedade questions vazia
+    }
+    await generatePDF(pdfActivity)
   }
 
-  const handleDeleteActivity = (activityId: string) => {
+  const handleDeleteActivity = async (activityId: string) => {
     if (confirm("Tem certeza que deseja excluir esta atividade?")) {
-      const updatedActivities = activities.filter((activity) => activity.id !== activityId)
-      setActivities(updatedActivities)
-      localStorage.setItem("userActivities", JSON.stringify(updatedActivities))
+      const success = await deleteActivity(activityId)
+      if (success) {
+        const updatedActivities = activities.filter((activity) => activity.id !== activityId)
+        setActivities(updatedActivities)
+      } else {
+        alert("Erro ao excluir atividade. Tente novamente.")
+      }
     }
   }
 
@@ -164,7 +178,7 @@ export function Dashboard() {
                         <div className="md:hidden text-sm text-gray-500 mt-1">{activity.grade}</div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{activity.grade}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{activity.activityType}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{activity.activity_type}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -217,10 +231,6 @@ export function Dashboard() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-gray-600 text-white text-center py-4 mt-12">
-        <p className="text-sm">AtivIA © 202X. All rights reserved.</p>
-      </footer>
     </div>
   )
 }

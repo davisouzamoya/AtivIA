@@ -113,11 +113,6 @@ export function LoginForm() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-gray-600 text-white text-center py-2">
-        <p className="text-xs">AtivIA © 202X. All rights reserved.</p>
-      </footer>
     </div>
   )
 }

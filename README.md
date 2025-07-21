@@ -1,30 +1,94 @@
-# Figma to prototype
+# AtivIA
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+**AtivIA** é uma plataforma que utiliza inteligência artificial para ajudar professores a criar atividades pedagógicas personalizadas em minutos, economizando tempo e promovendo o aprendizado adaptado para cada turma.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/davisouzamoyas-projects/v0-figma-to-prototype)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/tFi7B7ZrMm6)
+## ✨ Funcionalidades
 
-## Overview
+- **Geração automática de atividades**: múltipla escolha, verdadeiro ou falso, completar lacunas e dissertativas.
+- **Personalização**: escolha tema, disciplina, objetivo, série e quantidade de questões.
+- **Edição e armazenamento**: salve, edite e baixe suas atividades.
+- **Exportação em PDF**: gere PDFs prontos para impressão.
+- **Autenticação**: login seguro via Supabase.
+- **Alinhamento curricular**: atividades baseadas na BNCC e currículos estaduais.
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## 🚀 Começando
 
-## Deployment
+### Pré-requisitos
 
-Your project is live at:
+- Node.js 18+
+- Conta no [Supabase](https://supabase.com/)
+- Chave de API do Google Gemini (para geração de conteúdo IA)
 
-**[https://vercel.com/davisouzamoyas-projects/v0-figma-to-prototype](https://vercel.com/davisouzamoyas-projects/v0-figma-to-prototype)**
+### Instalação
 
-## Build your app
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/seu-usuario/seu-repo.git
+   cd seu-repo
+   ```
 
-Continue building your app on:
+2. Instale as dependências:
+   ```bash
+   npm install
+   # ou
+   pnpm install
+   ```
 
-**[https://v0.dev/chat/projects/tFi7B7ZrMm6](https://v0.dev/chat/projects/tFi7B7ZrMm6)**
+3. Configure as variáveis de ambiente em um arquivo `.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=...
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+   NEXT_PUBLIC_GOOGLE_API_KEY=...
+   ```
 
-## How It Works
+4. Inicie o projeto:
+   ```bash
+   npm run dev
+   # ou
+   pnpm dev
+   ```
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+5. Acesse em [http://localhost:3000](http://localhost:3000)
+
+## 🛠️ Scripts
+
+- `dev`: inicia o servidor de desenvolvimento
+- `build`: build de produção
+- `start`: inicia o servidor em produção
+- `lint`: executa o linter
+
+## 📦 Principais Tecnologias
+
+- [Next.js](https://nextjs.org/)
+- [React](https://react.dev/)
+- [Supabase](https://supabase.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [jsPDF](https://github.com/parallax/jsPDF) (geração de PDF)
+- [Google Gemini API](https://ai.google.dev/)
+
+## 📚 Estrutura das Atividades
+
+- **Múltipla escolha**: questões com alternativas (a)-(d), gabarito ao final.
+- **Verdadeiro ou falso**: afirmações para marcar, gabarito após cada questão.
+- **Completar lacunas**: frases com espaços para preencher, gabarito ao final.
+- **Dissertativa**: espaço para resposta escrita, orientações e linhas para o aluno.
+
+## 🗄️ Banco de Dados
+
+O projeto utiliza o Supabase para autenticação e armazenamento das atividades. Veja o arquivo `lib/activities.ts` para detalhes das operações CRUD.
+
+## 📤 Exportação em PDF
+
+Você pode exportar qualquer atividade para PDF, pronta para impressão, usando o botão disponível na tela de edição.
+
+## 🔒 Autenticação
+
+O login é obrigatório para criar, editar e visualizar atividades. O Supabase gerencia sessões e usuários.
+
+## 🧑‍💻 Contribuindo
+
+Pull requests são bem-vindos! Para grandes mudanças, abra uma issue primeiro para discutir o que você gostaria de modificar.
+
+## 📄 Licença
+
+[MIT](LICENSE)

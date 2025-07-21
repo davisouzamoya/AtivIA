@@ -2,58 +2,70 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Edit, Download } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { generatePDF } from "@/lib/pdf-generator"
 import { supabase } from "@/lib/supabase"
+import { getActivityById, updateActivity } from "@/lib/activities"
 import { useRouter } from "next/navigation"
-
-interface Question {
-  id: number
-  question: string
-  options: string[]
-  correctAnswer: number
-}
-
-interface Activity {
-  id: string
-  name: string
-  grade: string
-  subject: string
-  theme: string
-  objective: string
-  questions: Question[]
-  activityType: string
-}
+import type { Activity } from "@/types/database"
+import ReactMarkdown from "react-markdown"
 
 export function EditActivity({ activityId }: { activityId: string }) {
   const router = useRouter()
   const [activity, setActivity] = useState<Activity | null>(null)
   const [exportFormat, setExportFormat] = useState("pdf")
+  const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedText, setEditedText] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
-    // Load activity from localStorage
-    const storedActivities = localStorage.getItem("userActivities")
-    if (storedActivities) {
-      const activities = JSON.parse(storedActivities)
-      const foundActivity = activities.find((act: Activity) => act.id === activityId)
-      if (foundActivity) {
-        setActivity(foundActivity)
+    const loadActivity = async () => {
+      try {
+        console.log("Carregando atividade com ID:", activityId)
+        
+        // Check user session and redirect if not logged in
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+          console.log("Usuário não autenticado, redirecionando para login")
+          router.push("/login")
+          return
+        }
+
+        console.log("Usuário autenticado:", user.id)
+
+        // Teste: verificar se a tabela activities existe e tem dados
+        const { data: testData, error: testError } = await supabase
+          .from('activities')
+          .select('count')
+          .limit(1)
+        
+        console.log("Teste de conexão com activities:", { data: testData, error: testError })
+
+        // Load activity from Supabase
+        const foundActivity = await getActivityById(activityId)
+        console.log("Atividade encontrada:", foundActivity)
+        
+        if (foundActivity) {
+          setActivity(foundActivity)
+          setEditedText(foundActivity.text)
+        } else {
+          console.log("Atividade não encontrada no banco de dados")
+        }
+      } catch (error) {
+        console.error("Erro ao carregar atividade:", error)
+      } finally {
+        setLoading(false)
       }
     }
 
-    // Check user session and redirect if not logged in
-    const checkUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        router.push("/login")
-      }
-    }
-    checkUser()
+    loadActivity()
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
@@ -70,13 +82,68 @@ export function EditActivity({ activityId }: { activityId: string }) {
     if (!activity) return
 
     if (exportFormat === "pdf") {
-      await generatePDF(activity)
+      // Converter para o formato esperado pelo generatePDF
+      const pdfActivity = {
+        id: activity.id,
+        name: activity.name,
+        grade: activity.grade,
+        subject: activity.subject,
+        theme: activity.theme,
+        objective: activity.objective || "",
+        text: activity.text,
+        questions: [] // Array vazio para compatibilidade
+      }
+      await generatePDF(pdfActivity)
     }
+  }
+
+  const handleEdit = () => {
+    setIsEditing(true)
+    setEditedText(activity?.text || "")
+  }
+
+  const handleSave = async () => {
+    if (!activity) return
+    
+    setSaving(true)
+    try {
+      const updatedActivity = await updateActivity(activityId, {
+        text: editedText
+      })
+      
+      if (updatedActivity) {
+        setActivity(updatedActivity)
+        setIsEditing(false)
+        alert("Atividade salva com sucesso!")
+      } else {
+        alert("Erro ao salvar atividade. Tente novamente.")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar:", error)
+      alert("Erro ao salvar atividade. Tente novamente.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setIsEditing(false)
+    setEditedText(activity?.text || "")
   }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push("/login")
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">Carregando atividade...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!activity) {
@@ -123,14 +190,6 @@ export function EditActivity({ activityId }: { activityId: string }) {
             <div className="flex items-center justify-between mb-8">
               <h1 className="text-2xl font-bold text-gray-900">Atividade</h1>
               <div className="flex items-center gap-2">
-                <Select value={exportFormat} onValueChange={setExportFormat}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pdf">Exportar</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Button onClick={handleExport} className="bg-blue-600 hover:bg-blue-700">
                   <Download className="w-4 h-4 mr-2" />
                   Download
@@ -141,81 +200,91 @@ export function EditActivity({ activityId }: { activityId: string }) {
             {/* Activity Information */}
             <div className="space-y-4 mb-8">
               <div>
-                <span className="font-semibold text-gray-900">Nome: </span>
-                <span className="text-gray-700">{activity.name}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900">Série: </span>
-                <span className="text-gray-700">{activity.grade}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900">Disciplina: </span>
-                <span className="text-gray-700">{activity.subject}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900">Tema: </span>
-                <span className="text-gray-700">{activity.theme}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900">Tipo: </span>
-                <span className="text-gray-700">{activity.activityType}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900">Objetivo: </span>
-                <span className="text-gray-700">{activity.objective}</span>
+               <span className="font-semibold text-gray-900">Nome:</span>
+                 <span>{activity.name}</span>
+                 <br/>
+                 <span className="font-semibold text-gray-900">Série:</span>
+                 <span>{activity.grade}</span>
+                 <br/>
+                 <span className="font-semibold text-gray-900">Disciplina:</span>
+                 <span>{activity.subject}</span>
+                 <br/>
+                 <span className="font-semibold text-gray-900">Tema:</span>
+                 <span>{activity.theme}</span>
+                 <br/>
+                 <span className="font-semibold text-gray-900">Objetivo:</span>
+                 <span>{activity.objective}</span>
               </div>
             </div>
 
             {/* Questions Section */}
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Questões</h2>
-
-              <div className="space-y-8">
-                {activity.questions.map((question, index) => (
-                  <div key={question.id} className="relative">
-                    <div className="flex items-start justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900">
-                        {index + 1}. {question.question}
-                      </h3>
-                      <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700">
-                        <Edit className="w-4 h-4" />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Conteúdo da Atividade</h2>
+                {!isEditing && (
+                  <Button onClick={handleEdit} variant="outline" size="sm">
+                    <Edit className="w-4 h-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
+              </div>
+              
+              <div className="bg-gray-50 p-6 rounded-lg">
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div className="flex gap-2 mb-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowPreview(false)}
+                        className={!showPreview ? "bg-blue-100 border-blue-300" : ""}
+                      >
+                        Editar
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowPreview(true)}
+                        className={showPreview ? "bg-blue-100 border-blue-300" : ""}
+                      >
+                        Preview
                       </Button>
                     </div>
-
-                    <div className="space-y-2 ml-4">
-                      {question.options.map((option, optionIndex) => (
-                        <div
-                          key={optionIndex}
-                          className={`text-gray-700 ${
-                            optionIndex === question.correctAnswer ? "font-medium text-green-700" : ""
-                          }`}
-                        >
-                          {activity.activityType === "verdadeiro ou falso" ? (
-                            <span className="font-medium">{option}</span>
-                          ) : (
-                            <>
-                              <span className="font-medium">{String.fromCharCode(65 + optionIndex)})</span>
-                              <span className="ml-2">{option}</span>
-                            </>
-                          )}
-                          {optionIndex === question.correctAnswer && (
-                            <span className="ml-2 text-green-600 text-sm">✓ Correta</span>
-                          )}
-                        </div>
-                      ))}
+                    
+                    {!showPreview ? (
+                      <Textarea
+                        value={editedText}
+                        onChange={(e) => setEditedText(e.target.value)}
+                        placeholder="Digite o conteúdo da atividade..."
+                        className="min-h-[400px] font-mono text-sm"
+                      />
+                    ) : (
+                      <div className="min-h-[400px] bg-white p-4 rounded border">
+                        <ReactMarkdown>{editedText}</ReactMarkdown>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleSave} 
+                        disabled={saving}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {saving ? "Salvando..." : "Salvar"}
+                      </Button>
+                      <Button onClick={handleCancel} variant="outline">
+                        Cancelar
+                      </Button>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <ReactMarkdown>{activity.text}</ReactMarkdown>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-600 text-white text-center py-4 mt-12">
-        <p className="text-sm">AtivIA © 202X. All rights reserved.</p>
-      </footer>
     </div>
   )
 }
